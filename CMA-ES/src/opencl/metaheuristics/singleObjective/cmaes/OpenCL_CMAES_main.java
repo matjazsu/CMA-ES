@@ -1,23 +1,4 @@
-//  CMAES_main.java
-//
-//  Author:
-//       Esteban López-Camacho <esteban@lcc.uma.es>
-//
-//  Copyright (c) 2013 Esteban López-Camacho
-//
-//  This program is free software: you can redistribute it and/or modify
-//  it under the terms of the GNU Lesser General Public License as published by
-//  the Free Software Foundation, either version 3 of the License, or
-//  (at your option) any later version.
-//
-//  This program is distributed in the hope that it will be useful,
-//  but WITHOUT ANY WARRANTY; without even the implied warranty of
-//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-//  GNU Lesser General Public License for more details.
-// 
-//  You should have received a copy of the GNU Lesser General Public License
-//  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-package jmetal.metaheuristics.singleObjective.cmaes;
+package opencl.metaheuristics.singleObjective.cmaes;
 
 import java.io.IOException;
 import java.util.logging.FileHandler;
@@ -29,12 +10,12 @@ import jmetal.core.SolutionSet;
 
 /**
  * This class runs a single-objective CMA-ES algorithm.
- * Iterative version (CPU)
- * Mofidied by: matjaz suber
- * @date 02.2015
+ * OpenCL version (Host, CPU, GPU)
+ * @author: matjaz suber
+ * @date: 02.2015
  */
-public class CMAES_main {
-
+public class OpenCL_CMAES_main {
+	
 	//Private properties
 	private int cl_populationSize;
 	private int cl_maxEvaluations;
@@ -45,13 +26,13 @@ public class CMAES_main {
 	public FileHandler cl_fileHandler; //FileHandler object
 	
 	//Constructor
-	public CMAES_main(int populationSize, 
-				 	  int maxEvaluations, 
-				 	  Problem problem) throws SecurityException, IOException{
-	
+	public OpenCL_CMAES_main(int populationSize, 
+							 int maxEvaluations, 
+							 Problem problem) throws SecurityException, IOException{
+		
 		//Initialize logger and file handler
-		cl_logger = Logger.getLogger("CMAES_main");
-		cl_fileHandler = new FileHandler("CMAES_Iterative.log");
+		cl_logger = Logger.getLogger("OpenCL_CMAES_main");
+		cl_fileHandler = new FileHandler("CMAES_OpenCL.log");
 		cl_logger.addHandler(cl_fileHandler);
 		
 		//Initialite private properties
@@ -59,7 +40,7 @@ public class CMAES_main {
 		this.cl_maxEvaluations = maxEvaluations;
 		this.cl_problem = problem;
 		
-		this.cl_logger.info("Iterative version (CPU) -- initialized successfully.");
+		this.cl_logger.info("OpenCL version (Host, CPU, GPU) initialized successfully.");
 	}
 	
 	/**
@@ -79,7 +60,7 @@ public class CMAES_main {
 		    //######################## Initialization segment ########################//
 		    
 		    //Algorithm initialization - CMA ES on OpenCL
-		    algorithm = new CMAES(this.cl_problem);
+		    algorithm = new OpenCL_CMAES(this.cl_problem);
 		    
 		    //Setting algorithm parameters
 		    algorithm.setInputParameter("populationSize", this.cl_populationSize);
@@ -102,7 +83,7 @@ public class CMAES_main {
 		}
 		catch(Exception ex){
 			ex.getStackTrace();
-			this.cl_logger.severe("CMAES_main ERROR: " + ex.getMessage());
+			this.cl_logger.severe("OpenCL_CMAES_main ERROR: " + ex.getMessage());
 			throw ex;
 		}
 	}

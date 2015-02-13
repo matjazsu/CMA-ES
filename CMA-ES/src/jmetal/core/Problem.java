@@ -132,6 +132,9 @@ public abstract class Problem implements Serializable {
   public double getLowerLimit(int i) {
     return lowerLimit_[i] ;
   } // getLowerLimit
+  public double[] getLowerLimit(){
+	  return lowerLimit_;
+  }
     
   /** 
    * Gets the upper bound of the ith encodings.variable of the problem.
@@ -141,6 +144,10 @@ public abstract class Problem implements Serializable {
   public double getUpperLimit(int i) {
     return upperLimit_[i] ;
   } // getUpperLimit 
+  
+  public double[] getUpperLimit(){
+	  return upperLimit_;
+  }
     
   /**
    * Evaluates a <code>Solution</code> object.
