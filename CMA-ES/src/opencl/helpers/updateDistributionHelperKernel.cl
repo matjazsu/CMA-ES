@@ -9,7 +9,9 @@ __kernel void updateDistributionHelper(int N,
                                __global float* artmp22array,
                                __global float* B2Array,
                                __global float* diagD,
-                               __global float* invsqrtC2array
+                               __global float* invsqrtC2array,
+                               __global float* C2Array,
+                               __global float* offdiag
                                )
 {
     //Get properties of current work item
@@ -17,6 +19,10 @@ __kernel void updateDistributionHelper(int N,
     
     if(globalId >= N){
         return;
+    }
+    
+    for (int j = 0; j <= globalId; j++) {
+        B2Array[(N * globalId) + j] = B2Array[(N * j) + globalId] = C2Array[(N * globalId) + j];
     }
     
     diagD[globalId] = sqrt(diagD[globalId]);

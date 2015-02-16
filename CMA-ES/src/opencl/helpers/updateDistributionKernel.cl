@@ -11,6 +11,7 @@ __kernel void updateDistribution(int N,
                                  int lambda,
                                  float sigma,
                                  float chiN,
+                                 float damps,
                                  float cc,
                                  float mueff,
                                  float cmu,
@@ -120,4 +121,7 @@ __kernel void updateDistribution(int N,
         }
     }
     
+    if(globalId == 0){
+        sigma *= exp((cs/damps) * (sqrt(psxps[0])/chiN - 1));
+    }
 }

@@ -5,6 +5,7 @@ import java.util.Random;
 
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
+import org.jocl.cl_event;
 import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
 import org.jocl.cl_program;
@@ -37,6 +38,8 @@ public class OpenCL_CMAES extends Algorithm {
 
 	//Stores the population size
 	private int populationSize;
+	private int N;
+	private int lambda;
 
 	private int counteval;
 	private int maxEvaluations;
@@ -45,7 +48,10 @@ public class OpenCL_CMAES extends Algorithm {
 
 	private float [] xmean;
 	private float [] xold;
-
+	private float[] psxps;
+	private float[] artmp;
+	private float[] artmp22array;
+	
 	//Strategy parameter setting: Selection
 	private int mu;
 	private float [] weights;
@@ -62,24 +68,21 @@ public class OpenCL_CMAES extends Algorithm {
 	private float [] pc;
 	private float [] ps;
 	private float [][] B;
+	private float[] B2array;
 	private float [] diagD;
 	private float [][] C;
 	private float [][] invsqrtC;
+	private float[] invsqrtC2array;
 	private int eigeneval;
 	private float chiN;
 
 	private float [][] arx;
+	private float[] arx2array;
 
 	//SolutionSet
 	private SolutionSet population_;
 	//Best solution ever
 	private Solution bestSolutionEver = null;
-
-	//OpenCL Kernels variables
-	private String samplePopulationKernel = "";
-	private String updateDistributionKernel = "";
-	private String updateDistributionHelperKernel = "";
-	private String resampleSingleKernel = "";
 
 	//Refence to OpenCL_Manager
 	private OpenCL_Manager _openCLManager;
@@ -105,6 +108,10 @@ public class OpenCL_CMAES extends Algorithm {
 	private cl_mem pcMem;
 	private cl_mem C2arrayMem;
 	private cl_mem artmp22arrayMem;
+	private cl_mem offdiagMem;
+	
+	//cl_pointer 
+	private Pointer p_arx2array; //read 
 
 	//########################### CMAES_OpenCL constructor ###########################//
 
@@ -121,27 +128,6 @@ public class OpenCL_CMAES extends Algorithm {
 
 		//Initializa OpenCL context
 		_openCLManager.InitOpenCLContext();
-
-		//Init OpenCL kernels
-		initOpenCLKernels();
-	}
-
-	/**
-	 * Read and set OpenCL Kernels
-	 * @throws Exception 
-	 */
-	private void initOpenCLKernels() throws Exception{
-		//Read samplePopulationKernel
-		samplePopulationKernel = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_samplePopulation);
-
-		//Read updateDistributionKernel 
-		updateDistributionKernel = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateDistribution);
-
-		//Read updateDistributionHelperKernel 
-		updateDistributionHelperKernel = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateDistributionHelper);
-
-		//Read resampleSingleKernel
-		resampleSingleKernel = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_resampleSingle);
 	}
 
 	//########################### EXECUTE ###########################//
@@ -207,9 +193,21 @@ public class OpenCL_CMAES extends Algorithm {
 
 		/* User defined input parameters */
 
-		// number of objective variables/problem dimension
-		int N = problem_.getNumberOfVariables();
-
+		//number of objective variables/problem dimension
+		N = problem_.getNumberOfVariables();
+		
+		//init lambda
+		lambda = populationSize;
+		
+		//init psxps
+		psxps = new float[N];
+		
+		//init artmp
+		artmp = new float[N];
+		
+		//init artmp22array
+		artmp22array = new float[N*N];
+		
 		// objective variables initial point
 		xmean = new float[N];
 		for (int i = 0; i < N; i++) {
@@ -309,10 +307,12 @@ public class OpenCL_CMAES extends Algorithm {
 
 		xold = new float[N];
 		arx = new float[lambda][N];
+		
+		//initialize memory objects
+		initMemoryObjects();
 	}
 
 	//########################### Method samplePopulation() ###########################//
-
 
 	/**
 	 * OpenCL implementation of the method samplePopulation()
@@ -320,67 +320,15 @@ public class OpenCL_CMAES extends Algorithm {
 	 * @return SolutionSet
 	 */
 	private SolutionSet samplePopulation() throws JMException, ClassNotFoundException{
-
-		int N = problem_.getNumberOfVariables();
+		
 		float [] artmp = new float[N];
 
-		//B2array
-		float[] B2array = matrix2array(B);
-		//arx2array
-		float[] arx2array = matrix2array(arx);
-
-		//Create pointers
-		Pointer p_B2array = Pointer.to(B2array);
-		Pointer p_arx2array = Pointer.to(arx2array);
-		Pointer p_xmean = Pointer.to(xmean);
-
-		//B2array
-		B2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,  
-				Sizeof.cl_float * B2array.length,
-				p_B2array, 
-				null);
-
-		//arx2array
-		arx2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * arx2array.length,
-				p_arx2array, 
-				null);
-
-		//xmean
-		xmeanMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-				Sizeof.cl_float * xmean.length,
-				p_xmean, 
-				null);
-
-		//Create the program from the source code
-		_openCLManager.program = clCreateProgramWithSource(_openCLManager.context,
-				1, 
-				new String[]{ samplePopulationKernel }, 
-				null, 
-				null);
-
-		//Build the program
-		clBuildProgram(_openCLManager.program, 
-				0, 
-				null, 
-				null, 
-				null, 
-				null);
-
-		//Create the kernel
-		_openCLManager.kernel = clCreateKernel(_openCLManager.program, 
-				OpenCL_Kernels_Enums.name_samplePopulation, 
-				null);
-
 		//Set the arguments for the kernel
-		clSetKernelArg(_openCLManager.kernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-		clSetKernelArg(_openCLManager.kernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
-		clSetKernelArg(_openCLManager.kernel, 3, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
-		clSetKernelArg(_openCLManager.kernel, 4, Sizeof.cl_mem, Pointer.to(xmeanMem));
-		clSetKernelArg(_openCLManager.kernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 3, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 4, Sizeof.cl_mem, Pointer.to(xmeanMem));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
 
 		//Set local_work_size
 		long localWorkSize = _openCLManager.getLocalWorkSize(N);
@@ -404,12 +352,12 @@ public class OpenCL_CMAES extends Algorithm {
 					null);
 
 			//Set the arguments for the kernel
-			clSetKernelArg(_openCLManager.kernel, 1, Sizeof.cl_mem, Pointer.to(artmpMem));
-			clSetKernelArg(_openCLManager.kernel, 6, Sizeof.cl_int, Pointer.to(new int[]{ iNk }));
+			clSetKernelArg(_openCLManager._samplePopulationKernel, 1, Sizeof.cl_mem, Pointer.to(artmpMem));
+			clSetKernelArg(_openCLManager._samplePopulationKernel, 6, Sizeof.cl_int, Pointer.to(new int[]{ iNk }));
 
 			//Execute the kernel
 			clEnqueueNDRangeKernel(_openCLManager.commandQueue, 
-					_openCLManager.kernel, 
+					_openCLManager._samplePopulationKernel, 
 					1, 
 					null,
 					new long[]{ globalWorkSize }, 
@@ -417,9 +365,8 @@ public class OpenCL_CMAES extends Algorithm {
 					0, 
 					null, 
 					null);
-
 		}		
-
+		
 		//Read the output data
 		clEnqueueReadBuffer(_openCLManager.commandQueue, 
 				arx2arrayMem, 
@@ -430,19 +377,13 @@ public class OpenCL_CMAES extends Algorithm {
 				0, 
 				null, 
 				null);
-
-		//Wait until all commands has finished in the command queue
-		clFinish(_openCLManager.commandQueue);
-		//Release kernel
-		clReleaseKernel(_openCLManager.kernel);
-		//Release program
-		clReleaseProgram(_openCLManager.program);
-
+		
+		//convert device array to matrix
 		arx = array2matrix(arx2array, arx.length, arx[0].length);
 
 		return genoPhenoTransformation(arx);
 	}
-
+	
 	//########################### Method updateDistribution() ###########################//
 
 	/**
@@ -453,8 +394,6 @@ public class OpenCL_CMAES extends Algorithm {
 	private void updateDistribution() throws JMException{
 
 		//Local variables
-		int N = problem_.getNumberOfVariables();
-		int lambda = populationSize;
 		float [] arfitness = new float[lambda];
 		int [] arindex = new int[lambda];
 
@@ -465,34 +404,6 @@ public class OpenCL_CMAES extends Algorithm {
 		}
 		Utils.minFastSort(arfitness, arindex, lambda);
 
-		//########################### OpenCL ###########################//
-
-		//ps
-		Pointer p_ps = Pointer.to(ps);
-		psMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * ps.length,
-				p_ps, 
-				null);
-
-		//psxps
-		float[] psxps = new float[N];
-		Pointer p_psxps = Pointer.to(psxps);
-		psxpsMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * psxps.length,
-				p_psxps, 
-				null);
-
-		//arx2array
-		float[] arx2array = matrix2array(arx);
-		Pointer p_arx2array = Pointer.to(arx2array);
-		arx2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * arx2array.length,
-				p_arx2array, 
-				null);
-
 		//arindex
 		Pointer p_arindex = Pointer.to(arindex);
 		arindexMem = clCreateBuffer(_openCLManager.context, 
@@ -501,110 +412,32 @@ public class OpenCL_CMAES extends Algorithm {
 				p_arindex, 
 				null);
 
-		//xmean
-		Pointer p_xmean = Pointer.to(xmean);
-		xmeanMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * xmean.length,
-				p_xmean, 
-				null);
-
-		//xold
-		Pointer p_xold = Pointer.to(xold);
-		xoldMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * xold.length,
-				p_xold, 
-				null);
-
-		//pc
-		Pointer p_pc = Pointer.to(pc);
-		pcMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * pc.length,
-				p_pc, 
-				null);
-
-		//artmp
-		float[] artmp = new float[N];
-		Pointer p_artmp = Pointer.to(artmp);
-		artmpMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * artmp.length,
-				p_artmp, 
-				null);
-
-		//invsqrtC2array
-		float[] invsqrtC2array = matrix2array(invsqrtC);
-		Pointer p_invsqrtC2array = Pointer.to(invsqrtC2array);
-		invsqrtC2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * invsqrtC2array.length,
-				p_invsqrtC2array, 
-				null);
-
-		//C2array
-		float[] C2array = matrix2array(C);
-		Pointer p_C2array = Pointer.to(C2array);
-		C2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * C2array.length,
-				p_C2array, 
-				null);
-
-		//weights
-		Pointer p_weights = Pointer.to(weights);
-		weightsMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * weights.length,
-				p_weights, 
-				null);
-
-		//Create the program from the source code
-		_openCLManager.program = clCreateProgramWithSource(_openCLManager.context,
-				1, 
-				new String[]{ updateDistributionKernel }, 
-				null, 
-				null);
-
-		//Build the program
-		clBuildProgram(_openCLManager.program, 
-				0, 
-				null, 
-				null, 
-				null, 
-				null);
-
-		//Create the kernel
-		_openCLManager.kernel = clCreateKernel(_openCLManager.program, 
-				OpenCL_Kernels_Enums.name_updateDistribution, 
-				null);
-
 		//Set the arguments for the kernel
-		clSetKernelArg(_openCLManager.kernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-		clSetKernelArg(_openCLManager.kernel, 1, Sizeof.cl_int, Pointer.to(new int[]{ mu }));
-		clSetKernelArg(_openCLManager.kernel, 2, Sizeof.cl_float, Pointer.to(new float[]{ cs }));
-		clSetKernelArg(_openCLManager.kernel, 3, Sizeof.cl_int, Pointer.to(new int[]{ counteval }));
-		clSetKernelArg(_openCLManager.kernel, 4, Sizeof.cl_int, Pointer.to(new int[]{ lambda }));
-		clSetKernelArg(_openCLManager.kernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
-		clSetKernelArg(_openCLManager.kernel, 6, Sizeof.cl_float, Pointer.to(new float[]{ chiN }));
-		clSetKernelArg(_openCLManager.kernel, 7, Sizeof.cl_float, Pointer.to(new float[]{ cc }));
-		clSetKernelArg(_openCLManager.kernel, 8, Sizeof.cl_float, Pointer.to(new float[]{ mueff }));
-		clSetKernelArg(_openCLManager.kernel, 9, Sizeof.cl_float, Pointer.to(new float[]{ cmu }));
-		clSetKernelArg(_openCLManager.kernel, 10, Sizeof.cl_float, Pointer.to(new float[]{ c1 }));
-
-		clSetKernelArg(_openCLManager.kernel, 11, Sizeof.cl_mem, Pointer.to(psMem));
-		clSetKernelArg(_openCLManager.kernel, 12, Sizeof.cl_float * ps.length, null);
-		clSetKernelArg(_openCLManager.kernel, 13, Sizeof.cl_mem, Pointer.to(psxpsMem));
-		clSetKernelArg(_openCLManager.kernel, 14, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
-		clSetKernelArg(_openCLManager.kernel, 15, Sizeof.cl_mem, Pointer.to(arindexMem));
-		clSetKernelArg(_openCLManager.kernel, 16, Sizeof.cl_mem, Pointer.to(xmeanMem));
-		clSetKernelArg(_openCLManager.kernel, 17, Sizeof.cl_mem, Pointer.to(xoldMem));
-		clSetKernelArg(_openCLManager.kernel, 18, Sizeof.cl_mem, Pointer.to(pcMem));
-		clSetKernelArg(_openCLManager.kernel, 19, Sizeof.cl_mem, Pointer.to(artmpMem));
-		clSetKernelArg(_openCLManager.kernel, 20, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
-		clSetKernelArg(_openCLManager.kernel, 21, Sizeof.cl_mem, Pointer.to(C2arrayMem));
-		clSetKernelArg(_openCLManager.kernel, 22, Sizeof.cl_mem, Pointer.to(weightsMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 1, Sizeof.cl_int, Pointer.to(new int[]{ mu }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 2, Sizeof.cl_float, Pointer.to(new float[]{ cs }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 3, Sizeof.cl_int, Pointer.to(new int[]{ counteval }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 4, Sizeof.cl_int, Pointer.to(new int[]{ lambda }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 6, Sizeof.cl_float, Pointer.to(new float[]{ chiN }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 7, Sizeof.cl_float, Pointer.to(new float[]{ damps }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 8, Sizeof.cl_float, Pointer.to(new float[]{ cc }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 9, Sizeof.cl_float, Pointer.to(new float[]{ mueff }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 10, Sizeof.cl_float, Pointer.to(new float[]{ cmu }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 11, Sizeof.cl_float, Pointer.to(new float[]{ c1 }));
+		
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 12, Sizeof.cl_mem, Pointer.to(psMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 13, Sizeof.cl_float * ps.length, null);
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 14, Sizeof.cl_mem, Pointer.to(psxpsMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 15, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 16, Sizeof.cl_mem, Pointer.to(arindexMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 17, Sizeof.cl_mem, Pointer.to(xmeanMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 18, Sizeof.cl_mem, Pointer.to(xoldMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 19, Sizeof.cl_mem, Pointer.to(pcMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 20, Sizeof.cl_mem, Pointer.to(artmpMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 21, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 22, Sizeof.cl_mem, Pointer.to(C2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 23, Sizeof.cl_mem, Pointer.to(weightsMem));
 
 		//Set local_work_size
 		long localWorkSize = _openCLManager.getLocalWorkSize(N);
@@ -613,7 +446,7 @@ public class OpenCL_CMAES extends Algorithm {
 
 		//Execute the kernel
 		clEnqueueNDRangeKernel(_openCLManager.commandQueue, 
-				_openCLManager.kernel, 
+				_openCLManager._updateDistributionKernel, 
 				1, 
 				null,
 				new long[]{ globalWorkSize }, 
@@ -622,177 +455,22 @@ public class OpenCL_CMAES extends Algorithm {
 				null, 
 				null);
 
-		//Read ps
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				psMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * ps.length, 
-				p_ps, 
-				0, 
-				null, 
-				null);
-
-		//Read psxps
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				psxpsMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * psxps.length, 
-				p_psxps, 
-				0, 
-				null, 
-				null);
-
-		//Read xmean
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				xmeanMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * xmean.length, 
-				p_xmean, 
-				0, 
-				null, 
-				null);
-
-		//Read xold
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				xoldMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * xold.length, 
-				p_xold, 
-				0, 
-				null, 
-				null);
-
-		//Read pc
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				pcMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * pc.length, 
-				p_pc, 
-				0, 
-				null, 
-				null);
-
-		//Read invsqrtC
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				invsqrtC2arrayMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * invsqrtC2array.length, 
-				p_invsqrtC2array, 
-				0, 
-				null, 
-				null);
-
-		//Read C
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				C2arrayMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * C2array.length, 
-				p_C2array, 
-				0, 
-				null, 
-				null);
-
-		//Wait until all commands has finished in the command queue
-		clFinish(_openCLManager.commandQueue);
-		//Release kernel
-		clReleaseKernel(_openCLManager.kernel);
-		//Release program
-		clReleaseProgram(_openCLManager.program);
-
-		invsqrtC = array2matrix(invsqrtC2array, invsqrtC.length, invsqrtC[0].length);
-		C = array2matrix(C2array, C.length, C[0].length);
-
-		//Adapt step size sigma
-		sigma *= Math.exp((cs/damps) * (Math.sqrt(psxps[0])/chiN - 1));
-
 		if (counteval - eigeneval > lambda /(c1+cmu)/N/10) {
 
+			//set eigeneval
 			eigeneval = counteval;
 
-			// enforce symmetry
-			for (int i = 0; i < N; i++) {
-				for (int j = 0; j <= i; j++) {
-					B[i][j] = B[j][i] = C[i][j];
-				}
-			}
-
-			// eigen decomposition, B==normalized eigenvectors
-			float [] offdiag = new float[N];
-			Utils.tred2(N, B, diagD, offdiag);
-			Utils.tql2(N, diagD, offdiag, B);
-
-			//artmp2
-			float[][] artmp2 = new float[N][N];
-			float[] artmp22array = matrix2array(artmp2);
-			Pointer p_artmp22array = Pointer.to(artmp22array);
-			artmp22arrayMem = clCreateBuffer(_openCLManager.context, 
-					CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-					Sizeof.cl_float * artmp22array.length,
-					p_artmp22array, 
-					null);
-
-			//B2array
-			float[] B2array = matrix2array(B);
-			Pointer p_B2array = Pointer.to(B2array);
-			B2arrayMem = clCreateBuffer(_openCLManager.context, 
-					CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,  
-					Sizeof.cl_float * B2array.length,
-					p_B2array, 
-					null);
-
-			//diagD
-			Pointer p_diagD = Pointer.to(diagD);
-			diagDMem = clCreateBuffer(_openCLManager.context, 
-					CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-					Sizeof.cl_float * diagD.length,
-					p_diagD, 
-					null);
-
-			//invsqrtC2array
-			invsqrtC2array = matrix2array(invsqrtC);
-			p_invsqrtC2array = Pointer.to(invsqrtC2array);
-			invsqrtC2arrayMem = clCreateBuffer(_openCLManager.context, 
-					CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
-					Sizeof.cl_float * invsqrtC2array.length,
-					p_invsqrtC2array, 
-					null);
-
-			//Create the program from the source code
-			_openCLManager.program = clCreateProgramWithSource(_openCLManager.context,
-					1, 
-					new String[]{ updateDistributionHelperKernel }, 
-					null, 
-					null);
-
-			//Build the program
-			clBuildProgram(_openCLManager.program, 
-					0, 
-					null, 
-					null, 
-					null, 
-					null);
-
-			//Create the kernel
-			_openCLManager.kernel = clCreateKernel(_openCLManager.program, 
-					OpenCL_Kernels_Enums.name_updateDistributionHelper, 
-					null);
-
-			clSetKernelArg(_openCLManager.kernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-			clSetKernelArg(_openCLManager.kernel, 1, Sizeof.cl_mem, Pointer.to(artmp22arrayMem));
-			clSetKernelArg(_openCLManager.kernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
-			clSetKernelArg(_openCLManager.kernel, 3, Sizeof.cl_mem, Pointer.to(diagDMem));
-			clSetKernelArg(_openCLManager.kernel, 4, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 1, Sizeof.cl_mem, Pointer.to(artmp22arrayMem));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 3, Sizeof.cl_mem, Pointer.to(diagDMem));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 4, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 5, Sizeof.cl_mem, Pointer.to(C2arrayMem));
+			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 6, Sizeof.cl_mem, Pointer.to(offdiagMem));
 
 			//Execute the kernel
 			clEnqueueNDRangeKernel(_openCLManager.commandQueue, 
-					_openCLManager.kernel, 
+					_openCLManager._updateDistributionHelperKernel, 
 					1, 
 					null,
 					new long[]{ globalWorkSize }, 
@@ -800,40 +478,134 @@ public class OpenCL_CMAES extends Algorithm {
 					0, 
 					null, 
 					null);
-
-			//Read diagD
-			clEnqueueReadBuffer(_openCLManager.commandQueue, 
-					diagDMem, 
-					CL_TRUE, 
-					0,
-					Sizeof.cl_float * diagD.length, 
-					p_diagD, 
-					0, 
-					null, 
-					null);
-
-			//Read invsqrtC
-			clEnqueueReadBuffer(_openCLManager.commandQueue, 
-					invsqrtC2arrayMem, 
-					CL_TRUE, 
-					0,
-					Sizeof.cl_float * invsqrtC2array.length, 
-					p_invsqrtC2array, 
-					0, 
-					null, 
-					null);
-
-			//Wait until all commands has finished in the command queue
-			clFinish(_openCLManager.commandQueue);
-			//Release kernel
-			clReleaseKernel(_openCLManager.kernel);
-			//Release program
-			clReleaseProgram(_openCLManager.program);
-
-			invsqrtC = array2matrix(invsqrtC2array, invsqrtC.length, invsqrtC[0].length);
 		}
 	}
 
+	//########################### Method initStaticKernelArgs() ###########################//
+	
+	/**
+	 * 
+	 */
+	private void initMemoryObjects(){
+		
+		//arx2array
+		arx2array = matrix2array(arx);
+		p_arx2array = Pointer.to(arx2array);
+		arx2arrayMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * arx2array.length,
+				p_arx2array, 
+				null);
+		
+		//xmean
+		Pointer p_xmean = Pointer.to(xmean);
+		xmeanMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+				Sizeof.cl_float * xmean.length,
+				p_xmean, 
+				null);
+		
+		//ps
+		Pointer p_ps = Pointer.to(ps);
+		psMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * ps.length,
+				p_ps, 
+				null);
+		
+		//psxps
+		Pointer p_psxps = Pointer.to(psxps);
+		psxpsMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * psxps.length,
+				p_psxps, 
+				null);
+		
+		//pc
+		Pointer p_pc = Pointer.to(pc);
+		pcMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * pc.length,
+				p_pc, 
+				null);
+		
+		//artmp
+		Pointer p_artmp = Pointer.to(artmp);
+		artmpMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * artmp.length,
+				p_artmp, 
+				null);
+		
+		//xold
+		Pointer p_xold = Pointer.to(xold);
+		xoldMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * xold.length,
+				p_xold, 
+				null);
+		
+		//weights
+		Pointer p_weights = Pointer.to(weights);
+		weightsMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * weights.length,
+				p_weights, 
+				null);
+		
+		//C2array
+		float[] C2array = matrix2array(C);
+		Pointer p_C2array = Pointer.to(C2array);
+		C2arrayMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * C2array.length,
+				p_C2array, 
+				null);
+		
+		//invsqrtC2array
+		invsqrtC2array = matrix2array(invsqrtC);
+		Pointer p_invsqrtC2array = Pointer.to(invsqrtC2array);
+		invsqrtC2arrayMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * invsqrtC2array.length,
+				p_invsqrtC2array, 
+				null);
+		
+		//B2array
+		B2array = matrix2array(B);
+		Pointer p_B2array = Pointer.to(B2array);
+		B2arrayMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,  
+				Sizeof.cl_float * B2array.length,
+				p_B2array, 
+				null);
+
+		//diagD
+		Pointer p_diagD = Pointer.to(diagD);
+		diagDMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * diagD.length,
+				p_diagD, 
+				null);
+		
+		//artmp2
+		Pointer p_artmp22array = Pointer.to(artmp22array);
+		artmp22arrayMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * artmp22array.length,
+				p_artmp22array, 
+				null);
+		
+		//offdiag
+		float [] offdiag = new float[N];
+		Pointer p_offdiag = Pointer.to(offdiag);
+		offdiagMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
+				Sizeof.cl_float * offdiag.length,
+				p_offdiag, 
+				null);
+	}
+	
 	//########################### CMA-ES origin methods ###########################//
 
 	/**
@@ -865,101 +637,13 @@ public class OpenCL_CMAES extends Algorithm {
 	 */
 	private Solution resampleSingle(int iNk) throws JMException, ClassNotFoundException {
 
-		int N = problem_.getNumberOfVariables();
-
-		//Temporary variables
-		double[] upperLimit = problem_.getUpperLimit();
-		double[] lowerLimit = problem_.getLowerLimit();
-		float[] arx2array = matrix2array(arx);
-
-		//Create pointers
-		Pointer p_upperLimit = Pointer.to(upperLimit);
-		Pointer p_lowerLimit = Pointer.to(lowerLimit);
-		Pointer p_arx2array = Pointer.to(arx2array);
-
-		//upperLimit
-		upperLimitMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * upperLimit.length,
-				p_upperLimit, 
-				null);
-
-		//lowerLimit
-		lowerLimitMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * lowerLimit.length,
-				p_lowerLimit, 
-				null);
-
-		//arx2array
-		arx2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, 
-				Sizeof.cl_float * arx2array.length,
-				p_arx2array, 
-				null);
-
-		//Create the program from the source code
-		_openCLManager.program = clCreateProgramWithSource(_openCLManager.context,
-				1, 
-				new String[]{ resampleSingleKernel }, 
-				null, 
-				null);
-
-		//Build the program
-		clBuildProgram(_openCLManager.program, 
-				0, 
-				null, 
-				null, 
-				null, 
-				null);
-
-		//Create the kernel
-		_openCLManager.kernel = clCreateKernel(_openCLManager.program, 
-				OpenCL_Kernels_Enums.name_resampleSingle, 
-				null);
-
-		//Set the arguments for the kernel
-		clSetKernelArg(_openCLManager.kernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-		clSetKernelArg(_openCLManager.kernel, 1, Sizeof.cl_mem, Pointer.to(upperLimitMem));
-		clSetKernelArg(_openCLManager.kernel, 2, Sizeof.cl_mem, Pointer.to(lowerLimitMem));
-		clSetKernelArg(_openCLManager.kernel, 3, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
-		clSetKernelArg(_openCLManager.kernel, 4, Sizeof.cl_int, Pointer.to(new int[]{ iNk }));
-
-		//Set local_work_size
-		long localWorkSize = _openCLManager.getLocalWorkSize(N);
-		//Set global_work_size
-		long globalWorkSize = _openCLManager.getGlobalWorkSize(localWorkSize, N);
-
-		//Execute the kernel
-		clEnqueueNDRangeKernel(_openCLManager.commandQueue, 
-				_openCLManager.kernel, 
-				1, 
-				null,
-				new long[]{ globalWorkSize }, 
-				new long[]{ localWorkSize }, 
-				0, 
-				null, 
-				null);
-
-		//Read the output data
-		clEnqueueReadBuffer(_openCLManager.commandQueue, 
-				arx2arrayMem, 
-				CL_TRUE, 
-				0,
-				Sizeof.cl_float * arx2array.length, 
-				p_arx2array, 
-				0, 
-				null, 
-				null);
-
-		//Wait until all commands has finished in the command queue
-		clFinish(_openCLManager.commandQueue);
-		//Release kernel
-		clReleaseKernel(_openCLManager.kernel);
-		//Release program
-		clReleaseProgram(_openCLManager.program);
-
-		arx = array2matrix(arx2array, arx.length, arx[0].length);
+		for (int i = 0; i < problem_.getNumberOfVariables(); i++) {
+			if (arx[iNk][i] > problem_.getUpperLimit(i)) {
+				arx[iNk][i] = (float) problem_.getUpperLimit(i);
+			} else if (arx[iNk][i] < problem_.getLowerLimit(i)) {
+				arx[iNk][i] = (float) problem_.getLowerLimit(i);
+			}
+		}
 
 		return genoPhenoTransformation(arx[iNk]);
 	}

@@ -34,21 +34,45 @@ public class OpenCL_Manager {
     private static cl_platform_id platform;
     public final long cl_deviceType = CL_DEVICE_TYPE_ALL;
     public final int cl_deviceIndex = 0;
+    
+    //context
     public static cl_context context;
+    //commandQueue
     public static cl_command_queue commandQueue;
-    public static cl_kernel kernel;
-    public static cl_program program;
+    
+    //samplePopulation
+    public static cl_kernel _samplePopulationKernel;
+    public static cl_program _samplePopulationProgram;
+    
+    //updateDistribution
+    public static cl_kernel _updateDistributionKernel;
+    public static cl_program _updateDistributionProgram;
+    
+    //updateDistribution
+    public static cl_kernel _updateDistributionHelperKernel;
+    public static cl_program _updateDistributionHelperProgram;
+    
+    //device
     public static cl_device_id[] devices;
     public static cl_device_id device;
     public int cl_numDevices;
+    
+    //device info
     public int cl_numberOfComputeUnits; //Stores the selected device number of Compute Units
     public long cl_workGroupSize; //Stores the selected decice Work Group size
     
+    //logger
     public Logger cl_logger; //Logger object
 	public FileHandler cl_fileHandler; //FileHandler object
 	
+	//OpenCL Kernels variables
+	private String samplePopulationKernelSource = "";
+	private String updateDistributionKernelSource = "";
+	private String updateDistributionHelperKernelSource = "";
+	private String resampleSingleKernelSource = "";
+	
 	//Constructor
-	public OpenCL_Manager() throws JMException, IOException{
+	public OpenCL_Manager() throws Exception{
 		//Initialize logger and file handler
 		cl_logger = Logger.getLogger("OpenCL_Manager");
 		cl_fileHandler = new FileHandler("OpenCL_Manager.log");
@@ -56,6 +80,9 @@ public class OpenCL_Manager {
 		
 		//Initialize OpenCL device
 		InitOpenCLDevice();
+		
+		//Init OpenCL kernels
+		initOpenCLKernels();
 	}
 	
 	/**
@@ -164,6 +191,18 @@ public class OpenCL_Manager {
 		        
 		        //Create a command-queue for the selected device
 		        commandQueue = clCreateCommandQueue(context, device, 0, null);
+		        
+		        //############################# Create/Build samplePopulation program #############################//
+		        
+		        createSamplePopulationProgram();
+		        
+		        //############################# Create/Build updateDistribution program #############################//
+		        
+		        createUpdateDistributionProgram();
+		        
+		        //############################# Create/Build updateDistributionHelper program #############################//
+		        
+		        createUpdateDistributionHelperProgram();
 			}
 			catch(Exception ex){
 				throw ex;
@@ -173,6 +212,22 @@ public class OpenCL_Manager {
 	
 	public void ReleaseOpenCLEnvironment(){
 		try{
+
+			//Release samplePopulation kernel
+			clReleaseKernel(_samplePopulationKernel);
+			//Release samplePopulation program
+			clReleaseProgram(_samplePopulationProgram);
+			
+			//Release updateDistribution kernel
+			clReleaseKernel(_updateDistributionKernel);
+			//Release updateDistribution program
+			clReleaseProgram(_updateDistributionProgram);
+			
+			//Release updateDistributionHelper kernel
+			clReleaseKernel(_updateDistributionHelperKernel);
+			//Release updateDistributionHelper program
+			clReleaseProgram(_updateDistributionHelperProgram);
+			
 			//Release CommandQueue
 			clReleaseCommandQueue(commandQueue);
 			
@@ -191,6 +246,99 @@ public class OpenCL_Manager {
 	 */
 	
 	/////---------------------------------------/////
+	
+	/**
+	 * Read and set OpenCL Kernels
+	 * @throws Exception 
+	 */
+	private void initOpenCLKernels() throws Exception{
+		//Read samplePopulationKernel
+		samplePopulationKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_samplePopulation);
+
+		//Read updateDistributionKernel 
+		updateDistributionKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateDistribution);
+
+		//Read updateDistributionHelperKernel 
+		updateDistributionHelperKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateDistributionHelper);
+	}
+	
+	/**
+	 * Creates OpenCL program for updateDistribution kernel
+	 */
+	private void createSamplePopulationProgram(){
+		
+		//Create the program from the source code
+		_samplePopulationProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ samplePopulationKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_samplePopulationProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_samplePopulationKernel = clCreateKernel(_samplePopulationProgram, 
+				OpenCL_Kernels_Enums.name_samplePopulation, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for updateDistribution kernel
+	 */
+	private void createUpdateDistributionProgram(){
+		
+		//Create the program from the source code
+		_updateDistributionProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ updateDistributionKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_updateDistributionProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_updateDistributionKernel = clCreateKernel(_updateDistributionProgram, 
+				OpenCL_Kernels_Enums.name_updateDistribution, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for updateDistribution kernel
+	 */
+	private void createUpdateDistributionHelperProgram(){
+		
+		//Create the program from the source code
+		_updateDistributionHelperProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ updateDistributionHelperKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_updateDistributionHelperProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_updateDistributionHelperKernel = clCreateKernel(_updateDistributionHelperProgram, 
+				OpenCL_Kernels_Enums.name_updateDistributionHelper, 
+				null);
+	}
 	
 	/**
 	 * Returns device with the best performance
