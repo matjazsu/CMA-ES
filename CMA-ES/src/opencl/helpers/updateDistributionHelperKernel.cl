@@ -4,6 +4,11 @@
 #pragma OPENCL EXTENSION cl_amd_fp64 : enable
 #endif
 
+#pragma OPENCL EXTENSION cl_khr_global_int32_base_atomics : enable
+#pragma OPENCL EXTENSION cl_khr_local_int32_base_atomics : enable
+#pragma OPENCL EXTENSION cl_khr_global_int32_extended_atomics : enable
+#pragma OPENCL EXTENSION cl_khr_local_int32_extended_atomics : enable
+
 /* Number of kernels = populationSize */
 __kernel void updateDistributionHelper(int N,
                                __global float* artmp22array,
@@ -17,7 +22,7 @@ __kernel void updateDistributionHelper(int N,
     //Get properties of current work item
     int globalId = get_global_id(0);
     
-    if(globalId >= N){
+    if(globalId > N){
         return;
     }
     

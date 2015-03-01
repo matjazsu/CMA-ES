@@ -35,7 +35,7 @@ __kernel void updateDistribution(int N,
     int groupId = get_group_id(0);
     int wgSize = get_local_size(0);
     
-    if(globalId >= N){
+    if(globalId > N){
         return;
     }
     

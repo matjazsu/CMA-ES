@@ -146,7 +146,7 @@ public class OpenCL_CMAES extends Algorithm {
 
 		//Host: Initalize ObjectiveComparator
 		Comparator comparator = new ObjectiveComparator(0);
-
+		
 		//Host: Initialize class variables
 		init();
 
@@ -172,7 +172,7 @@ public class OpenCL_CMAES extends Algorithm {
 
 		SolutionSet resultPopulation  = new SolutionSet(1);
 		resultPopulation.add(bestSolutionEver);
-
+		
 		//Release OpenCL environment
 		_openCLManager.ReleaseOpenCLEnvironment();
 
@@ -310,6 +310,9 @@ public class OpenCL_CMAES extends Algorithm {
 		
 		//initialize memory objects
 		initMemoryObjects();
+		
+		//initialize kernel arguments
+		setKernelArgs();
 	}
 
 	//########################### Method samplePopulation() ###########################//
@@ -322,13 +325,6 @@ public class OpenCL_CMAES extends Algorithm {
 	private SolutionSet samplePopulation() throws JMException, ClassNotFoundException{
 		
 		float [] artmp = new float[N];
-
-		//Set the arguments for the kernel
-		clSetKernelArg(_openCLManager._samplePopulationKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-		clSetKernelArg(_openCLManager._samplePopulationKernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
-		clSetKernelArg(_openCLManager._samplePopulationKernel, 3, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
-		clSetKernelArg(_openCLManager._samplePopulationKernel, 4, Sizeof.cl_mem, Pointer.to(xmeanMem));
-		clSetKernelArg(_openCLManager._samplePopulationKernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
 
 		//Set local_work_size
 		long localWorkSize = _openCLManager.getLocalWorkSize(N);
@@ -413,31 +409,7 @@ public class OpenCL_CMAES extends Algorithm {
 				null);
 
 		//Set the arguments for the kernel
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 1, Sizeof.cl_int, Pointer.to(new int[]{ mu }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 2, Sizeof.cl_float, Pointer.to(new float[]{ cs }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 3, Sizeof.cl_int, Pointer.to(new int[]{ counteval }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 4, Sizeof.cl_int, Pointer.to(new int[]{ lambda }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 6, Sizeof.cl_float, Pointer.to(new float[]{ chiN }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 7, Sizeof.cl_float, Pointer.to(new float[]{ damps }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 8, Sizeof.cl_float, Pointer.to(new float[]{ cc }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 9, Sizeof.cl_float, Pointer.to(new float[]{ mueff }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 10, Sizeof.cl_float, Pointer.to(new float[]{ cmu }));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 11, Sizeof.cl_float, Pointer.to(new float[]{ c1 }));
-		
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 12, Sizeof.cl_mem, Pointer.to(psMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 13, Sizeof.cl_float * ps.length, null);
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 14, Sizeof.cl_mem, Pointer.to(psxpsMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 15, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
 		clSetKernelArg(_openCLManager._updateDistributionKernel, 16, Sizeof.cl_mem, Pointer.to(arindexMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 17, Sizeof.cl_mem, Pointer.to(xmeanMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 18, Sizeof.cl_mem, Pointer.to(xoldMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 19, Sizeof.cl_mem, Pointer.to(pcMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 20, Sizeof.cl_mem, Pointer.to(artmpMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 21, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 22, Sizeof.cl_mem, Pointer.to(C2arrayMem));
-		clSetKernelArg(_openCLManager._updateDistributionKernel, 23, Sizeof.cl_mem, Pointer.to(weightsMem));
 
 		//Set local_work_size
 		long localWorkSize = _openCLManager.getLocalWorkSize(N);
@@ -460,14 +432,6 @@ public class OpenCL_CMAES extends Algorithm {
 			//set eigeneval
 			eigeneval = counteval;
 
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 1, Sizeof.cl_mem, Pointer.to(artmp22arrayMem));
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 3, Sizeof.cl_mem, Pointer.to(diagDMem));
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 4, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 5, Sizeof.cl_mem, Pointer.to(C2arrayMem));
-			clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 6, Sizeof.cl_mem, Pointer.to(offdiagMem));
-
 			//Execute the kernel
 			clEnqueueNDRangeKernel(_openCLManager.commandQueue, 
 					_openCLManager._updateDistributionHelperKernel, 
@@ -484,7 +448,7 @@ public class OpenCL_CMAES extends Algorithm {
 	//########################### Method initStaticKernelArgs() ###########################//
 	
 	/**
-	 * 
+	 * Initialize memory object for OpenCL
 	 */
 	private void initMemoryObjects(){
 		
@@ -604,6 +568,53 @@ public class OpenCL_CMAES extends Algorithm {
 				Sizeof.cl_float * offdiag.length,
 				p_offdiag, 
 				null);
+	}
+	
+	/**
+	 * Set static OpenCL Kernel's arguments
+	 */
+	private void setKernelArgs(){
+		
+		//Kernel - samplePopulationKernel
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 3, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 4, Sizeof.cl_mem, Pointer.to(xmeanMem));
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
+		
+		//Kernel - updateDistributionKernel
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 1, Sizeof.cl_int, Pointer.to(new int[]{ mu }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 2, Sizeof.cl_float, Pointer.to(new float[]{ cs }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 3, Sizeof.cl_int, Pointer.to(new int[]{ counteval }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 4, Sizeof.cl_int, Pointer.to(new int[]{ lambda }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 5, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 6, Sizeof.cl_float, Pointer.to(new float[]{ chiN }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 7, Sizeof.cl_float, Pointer.to(new float[]{ damps }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 8, Sizeof.cl_float, Pointer.to(new float[]{ cc }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 9, Sizeof.cl_float, Pointer.to(new float[]{ mueff }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 10, Sizeof.cl_float, Pointer.to(new float[]{ cmu }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 11, Sizeof.cl_float, Pointer.to(new float[]{ c1 }));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 12, Sizeof.cl_mem, Pointer.to(psMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 13, Sizeof.cl_float * ps.length, null);
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 14, Sizeof.cl_mem, Pointer.to(psxpsMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 15, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 17, Sizeof.cl_mem, Pointer.to(xmeanMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 18, Sizeof.cl_mem, Pointer.to(xoldMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 19, Sizeof.cl_mem, Pointer.to(pcMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 20, Sizeof.cl_mem, Pointer.to(artmpMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 21, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 22, Sizeof.cl_mem, Pointer.to(C2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionKernel, 23, Sizeof.cl_mem, Pointer.to(weightsMem));
+		
+		//Kernel - updateDistributionHelperKernel
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 0, Sizeof.cl_int, Pointer.to(new int[]{ N }));
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 1, Sizeof.cl_mem, Pointer.to(artmp22arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 2, Sizeof.cl_mem, Pointer.to(B2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 3, Sizeof.cl_mem, Pointer.to(diagDMem));
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 4, Sizeof.cl_mem, Pointer.to(invsqrtC2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 5, Sizeof.cl_mem, Pointer.to(C2arrayMem));
+		clSetKernelArg(_openCLManager._updateDistributionHelperKernel, 6, Sizeof.cl_mem, Pointer.to(offdiagMem));
 	}
 	
 	//########################### CMA-ES origin methods ###########################//

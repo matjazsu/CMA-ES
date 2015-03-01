@@ -17,7 +17,7 @@ __kernel void samplePopulation(int N,
     //Get properties of current work item
     int globalId = get_global_id(0);
     
-    if(globalId >= N){
+    if(globalId > N){
         return;
     }
     

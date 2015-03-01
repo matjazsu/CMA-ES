@@ -25,7 +25,6 @@ package jmetal.metaheuristics.singleObjective.cmaes;
 public class Utils {
 
 	// Symmetric Householder reduction to tridiagonal form, taken from JAMA package.
-
 	public static void tred2 (int n, double V[][], double d[], double e[]) {
 
 		//  This is derived from the Algol procedures tred2 by
@@ -142,7 +141,6 @@ public class Utils {
 	}
 
 	// Symmetric tridiagonal QL algorithm, taken from JAMA package.
-
 	public static void tql2 (int n, double d[], double e[], double V[][]) {
 
 		//  This is derived from the Algol procedures tql2, by
@@ -297,7 +295,6 @@ public class Utils {
 		return res;
 	}
 
-	/** sqrt(a^2 + b^2) without under/overflow. **/
 	private static double hypot(double a, double b) {
 		double r  = 0;
 		if (Math.abs(a) > Math.abs(b)) {
@@ -336,69 +333,9 @@ public class Utils {
 
 	} // minFastSort
 
-	//matjazsu additions
-	public static void minFastSort(float[] x, int[] idx, int size) {
-
-		for (int i = 0; i < size; i++) {
-			for (int j = i + 1; j < size; j++) {
-				if (x[i] > x[j]) {
-					float temp = x[i];
-					int tempIdx = idx[i];
-					x[i] = x[j];
-					x[j] = temp;
-					idx[i] = idx[j];
-					idx[j] = tempIdx;
-				} else if (x[i] == x[j]) {
-					if (idx[i] > idx[j]) {
-						float temp = x[i];
-						int tempIdx = idx[i];
-						x[i] = x[j];
-						x[j] = temp;
-						idx[i] = idx[j];
-						idx[j] = tempIdx;
-					}
-				} // if
-			}
-		} // for
-
-	}
-
-	public static int checkEigenSystem( int N,  float C[][], float diag[], float Q[][])
-	/*
-     exhaustive test of the output of the eigendecomposition
-     needs O(n^3) operations
-
-     produces error
-     returns number of detected inaccuracies
-	 */
-	{
-		/* compute Q diag Q^T and Q Q^T to check */
-		int i, j, k, res = 0;
-		float cc, dd;
-		String s;
-
-		for (i=0; i < N; ++i)
-			for (j=0; j < N; ++j) {
-				for (cc=0, dd=0, k=0; k < N; ++k) {
-					cc += diag[k] * Q[i][k] * Q[j][k];
-					dd += Q[i][k] * Q[j][k];
-				}
-				/* check here, is the normalization the right one? */
-				if (Math.abs(cc - C[i>j?i:j][i>j?j:i])/Math.sqrt(C[i][i]*C[j][j]) > 1e-10
-						&& Math.abs(cc - C[i>j?i:j][i>j?j:i]) > 1e-9) { /* quite large */
-					s = " " + i + " " + j + " " + cc + " " + C[i>j?i:j][i>j?j:i] + " " + (cc-C[i>j?i:j][i>j?j:i]);
-					System.err.println("jmetal.metaheuristics.cmaes.Utils.checkEigenSystem(): WARNING - imprecise result detected " + s);
-					++res;
-				}
-				if (Math.abs(dd - (i==j?1:0)) > 1e-10) {
-					s = i + " " + j + " " + dd;
-					System.err.println("jmetal.metaheuristics.cmaes.Utils.checkEigenSystem(): WARNING - imprecise result detected (Q not orthog.) " + s);
-					++res;
-				}
-			}
-		return res;
-	}
+	//############################### (float) Utils ###############################//
 	
+	// Symmetric Householder reduction to tridiagonal form, taken from JAMA package.
 	public static void tred2 (int n, float V[][], float d[], float e[]) {
 
 		//  This is derived from the Algol procedures tred2 by
@@ -514,6 +451,7 @@ public class Utils {
 		e[0] = 0;
 	}
 
+	// Symmetric tridiagonal QL algorithm, taken from JAMA package.
 	public static void tql2 (int n, float d[], float e[], float V[][]) {
 
 		//  This is derived from the Algol procedures tql2, by
@@ -630,6 +568,31 @@ public class Utils {
 				}
 			}
 		}
+	}
+
+	public static void minFastSort(float[] x, int[] idx, int size) {
+
+		for (int i = 0; i < size; i++) {
+			for (int j = i + 1; j < size; j++) {
+				if (x[i] > x[j]) {
+					float temp = x[i];
+					int tempIdx = idx[i];
+					x[i] = x[j];
+					x[j] = temp;
+					idx[i] = idx[j];
+					idx[j] = tempIdx;
+				} else if (x[i] == x[j]) {
+					if (idx[i] > idx[j]) {
+						float temp = x[i];
+						int tempIdx = idx[i];
+						x[i] = x[j];
+						x[j] = temp;
+						idx[i] = idx[j];
+						idx[j] = tempIdx;
+					}
+				} // if
+			}
+		} // for
 	}
 	
 } // Utils

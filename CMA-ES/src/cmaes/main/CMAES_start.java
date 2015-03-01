@@ -40,26 +40,21 @@ public class CMAES_start {
 			//Get version
 			//Version == 0 --> Iterative implementation
 			//Version == 1 --> OpenCL implementation
-			//cmaes_version = Integer.parseInt(args[0]);
-			cmaes_version = 0;
+			cmaes_version = Integer.parseInt(args[0]);
 			
 			//Get problem
 			//Problems: Griewank, Sphere, Rosenbrock, Rastrigin
-			//cmaes_problem = args[1];
-			cmaes_problem = "Griewank";
+			cmaes_problem = args[1];
 			
 			//Get number of problem variables
-			//cmaes_nrVariables = Integer.parseInt(args[2]);
-			cmaes_nrVariables = 100;
+			cmaes_nrVariables = Integer.parseInt(args[2]);
 			
 			//Get population size			
-			//cmaes_populationSize = Integer.parseInt(args[3]);
-			cmaes_populationSize = 100;
+			cmaes_populationSize = Integer.parseInt(args[3]);
 			
 			//Get maxEvaluations
-			//cmaes_maxEvaluations = Integer.parseInt(args[4]);
-			cmaes_maxEvaluations = 10000;
-			
+			cmaes_maxEvaluations = Integer.parseInt(args[4]);
+						
 			//##################### Set/Initialize problem #####################//
 			
 			switch(cmaes_problem){
