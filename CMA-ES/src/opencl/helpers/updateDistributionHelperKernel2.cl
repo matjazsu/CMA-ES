@@ -9,7 +9,6 @@
 #pragma OPENCL EXTENSION cl_khr_global_int32_extended_atomics : enable
 #pragma OPENCL EXTENSION cl_khr_local_int32_extended_atomics : enable
 
-/* Number of kernels = populationSize */
 __kernel void updateDistributionHelper(int N,
                                        __global float* artmp22array,
                                        __global float* B2Array,

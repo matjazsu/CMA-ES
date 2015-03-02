@@ -5,14 +5,9 @@ import java.util.Random;
 
 import org.jocl.Pointer;
 import org.jocl.Sizeof;
-import org.jocl.cl_event;
-import org.jocl.cl_kernel;
 import org.jocl.cl_mem;
-import org.jocl.cl_program;
 
 import static org.jocl.CL.*;
-import opencl.helpers.OpenCL_Kernels;
-import opencl.helpers.OpenCL_Kernels_Enums;
 import opencl.helpers.OpenCL_Manager;
 import jmetal.core.Algorithm;
 import jmetal.core.Problem;
@@ -112,6 +107,7 @@ public class OpenCL_CMAES extends Algorithm {
 	
 	//cl_pointer 
 	private Pointer p_arx2array; //read 
+	private Pointer p_diagD;
 
 	//########################### CMAES_OpenCL constructor ###########################//
 
@@ -442,6 +438,17 @@ public class OpenCL_CMAES extends Algorithm {
 					0, 
 					null, 
 					null);
+			
+			//Read the output data
+			clEnqueueReadBuffer(_openCLManager.commandQueue, 
+					diagDMem, 
+					CL_TRUE, 
+					0,
+					Sizeof.cl_float * diagD.length, 
+					p_diagD, 
+					0, 
+					null, 
+					null);
 		}
 	}
 
@@ -545,7 +552,7 @@ public class OpenCL_CMAES extends Algorithm {
 				null);
 
 		//diagD
-		Pointer p_diagD = Pointer.to(diagD);
+		p_diagD = Pointer.to(diagD);
 		diagDMem = clCreateBuffer(_openCLManager.context, 
 				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
 				Sizeof.cl_float * diagD.length,

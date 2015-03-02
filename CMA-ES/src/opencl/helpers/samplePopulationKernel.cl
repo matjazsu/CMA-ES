@@ -4,7 +4,6 @@
 #pragma OPENCL EXTENSION cl_amd_fp64 : enable
 #endif
 
-/* Number of kernels = populationSize */
 __kernel void samplePopulation(int N,
                                __global float* artmp, //read
                                __global float* B2Array, //read
