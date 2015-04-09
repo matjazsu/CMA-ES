@@ -4,30 +4,32 @@
 #pragma OPENCL EXTENSION cl_amd_fp64 : enable
 #endif
 
-__kernel void samplePopulation(int N,
-                               __global float* artmp, //read
+__kernel void samplePopulation(int populationSize, //read
+                               int numberOfVariables, //read
+                               __global float* diagD, //read
                                __global float* B2Array, //read
                                __global float* arx2Array, //set
                                __global float* xmean, //read
-                               float sigma, //read
-                               int iNK //read
+                               __global float* randomArray, //read
+                               float sigma //read
                                )
 {
     //Get properties of current work item
     int globalId = get_global_id(0);
     
-    if(globalId > N){
+    if(globalId > populationSize){
         return;
     }
     
     //private memory variable
     __private float sum = 0;
     
-    for(int j = 0; j < N; j++){
-        //write to private memory
-        sum += B2Array[(N * globalId) + j] * artmp[j];
+    for (int i = 0; i < numberOfVariables; i++) {
+        sum = 0;
+        for (int j = 0; j < numberOfVariables; j++) {
+            sum += B2Array[(numberOfVariables * i) + j] * (diagD[j] * randomArray[j]);
+        }
+        //write to global memory
+        arx2Array[(numberOfVariables * globalId) + i] = xmean[i] + sigma * sum;
     }
-    
-    //write to global memory
-    arx2Array[(N * iNK) + globalId] = (xmean[globalId] + sigma * sum);
 }

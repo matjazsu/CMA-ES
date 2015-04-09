@@ -32,7 +32,7 @@ public class OpenCL_Manager {
 	//Public properties
     public final int cl_platformIndex = 0;
     private static cl_platform_id platform;
-    public final long cl_deviceType = CL_DEVICE_TYPE_ALL;
+    public final long cl_deviceType = CL_DEVICE_TYPE_GPU;
     public final int cl_deviceIndex = 0;
     
     //context
@@ -44,11 +44,31 @@ public class OpenCL_Manager {
     public static cl_kernel _samplePopulationKernel;
     public static cl_program _samplePopulationProgram;
     
-    //updateDistribution
-    public static cl_kernel _updateDistributionKernel;
-    public static cl_program _updateDistributionProgram;
+    //storeBest
+    public static cl_kernel _storeBestKernel;
+    public static cl_program _storeBestProgram;
     
-    //updateDistribution
+    //computeFitness
+    public static cl_kernel _computeFitnessKernel;
+    public static cl_program _computeFitnessProgram;
+    
+    //calculateXmean
+    public static cl_kernel _calculateXmeanKernel;
+    public static cl_program _calculateXmeanProgram;
+    
+    //updateEvolutionPaths
+    public static cl_kernel _updateEvolutionPathsKernel;
+    public static cl_program _updateEvolutionPathsProgram;
+    
+    //calculateNorm
+    public static cl_kernel _calculateNormKernel;
+    public static cl_program _calculateNormProgram;
+    
+    //adaptCovarianceMatrix
+    public static cl_kernel _adaptCovarianceMatrixKernel;
+    public static cl_program _adaptCovarianceMatrixProgram;
+    
+    //updateDistributionHelper
     public static cl_kernel _updateDistributionHelperKernel;
     public static cl_program _updateDistributionHelperProgram;
     
@@ -67,9 +87,13 @@ public class OpenCL_Manager {
 	
 	//OpenCL Kernels variables
 	private String samplePopulationKernelSource = "";
-	private String updateDistributionKernelSource = "";
+	private String storeBestKernelSource = "";
+	private String computeFitnessKernelSource = "";
+	private String calculateXmeanKernelSource = "";
+	private String updateEvolutionPathsKernelSource = "";
+	private String calculateNormKernelSource = "";
+	private String adaptCovarianceMatrixKernelSource = "";
 	private String updateDistributionHelperKernelSource = "";
-	private String resampleSingleKernelSource = "";
 	
 	//Constructor
 	public OpenCL_Manager() throws Exception{
@@ -196,9 +220,29 @@ public class OpenCL_Manager {
 		        
 		        createSamplePopulationProgram();
 		        
-		        //############################# Create/Build updateDistribution program #############################//
+		        //############################# Create/Build storeBest program #############################//
 		        
-		        createUpdateDistributionProgram();
+		        storeBestProgram();
+		        
+		        //############################# Create/Build computeFitness program #############################//
+		        
+		        computeFitnessProgram();
+		        
+		        //############################# Create/Build calculateXmean program #############################//
+		        
+		        calculateXmeanProgram();
+		        
+		        //############################# Create/Build updateEvolutionPaths program #############################//
+		        
+		        updateEvolutionPathsProgram();
+		        
+		        //############################# Create/Build calculateNorm program #############################//
+		        
+		        calculateNormProgram();
+		        
+		        //############################# Create/Build adaptCovarianceMatrix program #############################//
+		        
+		        adaptCovarianceMatrixProgram();
 		        
 		        //############################# Create/Build updateDistributionHelper program #############################//
 		        
@@ -218,10 +262,35 @@ public class OpenCL_Manager {
 			//Release samplePopulation program
 			clReleaseProgram(_samplePopulationProgram);
 			
+			//Release storeBest kernel
+			clReleaseKernel(_storeBestKernel);
+			//Release storeBest program
+			clReleaseProgram(_storeBestProgram);
+			
+			//Release computeFitness kernel
+			clReleaseKernel(_computeFitnessKernel);
+			//Release computeFitness program
+			clReleaseProgram(_computeFitnessProgram);
+			
+			//Release computeFitness kernel
+			clReleaseKernel(_calculateXmeanKernel);
+			//Release computeFitness program
+			clReleaseProgram(_calculateXmeanProgram);
+			
+			//Release computeFitness kernel
+			clReleaseKernel(_updateEvolutionPathsKernel);
+			//Release computeFitness program
+			clReleaseProgram(_updateEvolutionPathsProgram);
+			
 			//Release updateDistribution kernel
-			clReleaseKernel(_updateDistributionKernel);
+			clReleaseKernel(_calculateNormKernel);
 			//Release updateDistribution program
-			clReleaseProgram(_updateDistributionProgram);
+			clReleaseProgram(_calculateNormProgram);
+			
+			//Release adaptCovarianceMatrix kernel
+			clReleaseKernel(_adaptCovarianceMatrixKernel);
+			//Release adaptCovarianceMatrix program
+			clReleaseProgram(_adaptCovarianceMatrixProgram);
 			
 			//Release updateDistributionHelper kernel
 			clReleaseKernel(_updateDistributionHelperKernel);
@@ -254,9 +323,24 @@ public class OpenCL_Manager {
 	private void initOpenCLKernels() throws Exception{
 		//Read samplePopulationKernel
 		samplePopulationKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_samplePopulation);
-
-		//Read updateDistributionKernel 
-		updateDistributionKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateDistribution);
+		
+		//Read storeBestKernel
+		storeBestKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_storeBest);
+		
+		//Read computeFitnessKernel
+		computeFitnessKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_computeFitness);
+		
+		//Read calculateXmeanKernel
+		calculateXmeanKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_calculateXmean);
+		
+		//Read updateEvolutionPathsKernel
+		updateEvolutionPathsKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateEvolutionPaths);
+		
+		//Read calculateNormKernel
+		calculateNormKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_calculateNorm);
+		
+		//Read adaptCovarianceMatrixKernel
+		adaptCovarianceMatrixKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_adaptCovarianceMatrix);
 
 		//Read updateDistributionHelperKernel 
 		updateDistributionHelperKernelSource = OpenCL_Kernels.GetKernel(OpenCL_Kernels_Enums.path_updateDistributionHelper);
@@ -291,17 +375,17 @@ public class OpenCL_Manager {
 	/**
 	 * Creates OpenCL program for updateDistribution kernel
 	 */
-	private void createUpdateDistributionProgram(){
+	private void storeBestProgram(){
 		
 		//Create the program from the source code
-		_updateDistributionProgram = clCreateProgramWithSource(context,
+		_storeBestProgram = clCreateProgramWithSource(context,
 				1, 
-				new String[]{ updateDistributionKernelSource }, 
+				new String[]{ storeBestKernelSource }, 
 				null, 
 				null);
 
 		//Build the program
-		clBuildProgram(_updateDistributionProgram, 
+		clBuildProgram(_storeBestProgram, 
 				0, 
 				null, 
 				null, 
@@ -309,8 +393,138 @@ public class OpenCL_Manager {
 				null);
 
 		//Create the kernel
-		_updateDistributionKernel = clCreateKernel(_updateDistributionProgram, 
-				OpenCL_Kernels_Enums.name_updateDistribution, 
+		_storeBestKernel = clCreateKernel(_storeBestProgram, 
+				OpenCL_Kernels_Enums.name_storeBest, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for computeFitness kernel
+	 */
+	private void computeFitnessProgram(){
+		
+		//Create the program from the source code
+		_computeFitnessProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ computeFitnessKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_computeFitnessProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_computeFitnessKernel = clCreateKernel(_computeFitnessProgram, 
+				OpenCL_Kernels_Enums.name_computeFitness, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for computeFitness kernel
+	 */
+	private void calculateXmeanProgram(){
+		
+		//Create the program from the source code
+		_calculateXmeanProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ calculateXmeanKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_calculateXmeanProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_calculateXmeanKernel = clCreateKernel(_calculateXmeanProgram, 
+				OpenCL_Kernels_Enums.name_calculateXmean, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for updateEvolutionPaths kernel
+	 */
+	private void updateEvolutionPathsProgram(){
+		
+		//Create the program from the source code
+		_updateEvolutionPathsProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ updateEvolutionPathsKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_updateEvolutionPathsProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_updateEvolutionPathsKernel = clCreateKernel(_updateEvolutionPathsProgram, 
+				OpenCL_Kernels_Enums.name_updateEvolutionPaths, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for calculateNorm kernel
+	 */
+	private void calculateNormProgram(){
+		
+		//Create the program from the source code
+		_calculateNormProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ calculateNormKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_calculateNormProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_calculateNormKernel = clCreateKernel(_calculateNormProgram, 
+				OpenCL_Kernels_Enums.name_calculateNorm, 
+				null);
+	}
+	
+	/**
+	 * Creates OpenCL program for adaptCovarianceMatrix kernel
+	 */
+	private void adaptCovarianceMatrixProgram(){
+		
+		//Create the program from the source code
+		_adaptCovarianceMatrixProgram = clCreateProgramWithSource(context,
+				1, 
+				new String[]{ adaptCovarianceMatrixKernelSource }, 
+				null, 
+				null);
+
+		//Build the program
+		clBuildProgram(_adaptCovarianceMatrixProgram, 
+				0, 
+				null, 
+				null, 
+				null, 
+				null);
+
+		//Create the kernel
+		_adaptCovarianceMatrixKernel = clCreateKernel(_adaptCovarianceMatrixProgram, 
+				OpenCL_Kernels_Enums.name_adaptCovarianceMatrix, 
 				null);
 	}
 	

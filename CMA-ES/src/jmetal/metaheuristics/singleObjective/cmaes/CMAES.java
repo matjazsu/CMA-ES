@@ -304,7 +304,7 @@ public class CMAES extends Algorithm {
 			arfitness[i] = (float) population_.get(i).getObjective(0);
 			arindex[i] = i;
 		}
-		Utils.minFastSort(arfitness, arindex, lambda);
+		//Utils.minFastSort(arfitness, arindex, lambda);
 
 		// calculate xmean and BDz~N(0,C)
 		for (int i = 0; i < N; i++) {
