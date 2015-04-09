@@ -34,6 +34,7 @@ public class OpenCL_Manager {
     private static cl_platform_id platform;
     public final long cl_deviceType = CL_DEVICE_TYPE_GPU;
     public final int cl_deviceIndex = 0;
+    private int cl_selectedDevice;
     
     //context
     public static cl_context context;
@@ -96,11 +97,14 @@ public class OpenCL_Manager {
 	private String updateDistributionHelperKernelSource = "";
 	
 	//Constructor
-	public OpenCL_Manager() throws Exception{
+	public OpenCL_Manager(int selectedDevice) throws Exception{
 		//Initialize logger and file handler
 		cl_logger = Logger.getLogger("OpenCL_Manager");
 		cl_fileHandler = new FileHandler("OpenCL_Manager.log");
 		cl_logger.addHandler(cl_fileHandler);
+		
+		//Initialize properties
+		this.cl_selectedDevice = selectedDevice;
 		
 		//Initialize OpenCL device
 		InitOpenCLDevice();
@@ -176,7 +180,12 @@ public class OpenCL_Manager {
 	        }
 	        
 	        //Select device with the best performance
-	        device = selectTheBestDevice(devices);
+	        if(this.cl_selectedDevice >= 0){
+	        	device = selectDeviceWithIndex(this.cl_selectedDevice);
+	        }
+	        else{
+	        	device = selectTheBestDevice(devices);
+	        }
 	        
 	        //Log device information
 	        printDeviceInfo(device);
@@ -593,6 +602,24 @@ public class OpenCL_Manager {
 		
 		//Return device with the best performance 
 		return bestDevice;
+	}
+	
+	/**
+	 * Returns device with the given index
+	 * @param deviceIndex
+	 * @return
+	 */
+	private cl_device_id selectDeviceWithIndex(int deviceIndex){
+		
+		//Select device with the given index
+		cl_device_id selectedDevice = devices[deviceIndex];
+		//Set the number of Compute Units
+		cl_numberOfComputeUnits = getInt(devices[deviceIndex], CL_DEVICE_MAX_COMPUTE_UNITS);
+		//Set the Work Group size
+		cl_workGroupSize = getSize(devices[deviceIndex], CL_DEVICE_MAX_WORK_GROUP_SIZE);
+		
+		//Return selected device 
+		return selectedDevice;
 	}
 	
 	/**

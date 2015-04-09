@@ -22,6 +22,7 @@ public class CMAES_start {
 	private static int cmaes_nrVariables;
 	private static int cmaes_populationSize;
 	private static int cmaes_maxEvaluations;
+	private static int cmaes_selectedDevice;
 	
 	/**
 	 * Method main
@@ -40,25 +41,30 @@ public class CMAES_start {
 			//Get version
 			//Version == 0 --> Iterative implementation
 			//Version == 1 --> OpenCL implementation
-			//cmaes_version = Integer.parseInt(args[0]);
-			cmaes_version = 1;
+			cmaes_version = Integer.parseInt(args[0]);
+			//cmaes_version = 1;
 			
 			//Get problem
 			//Problems: Griewank, Sphere, Rosenbrock, Rastrigin
-			//cmaes_problem = args[1];
-			cmaes_problem = "Rosenbrock";
+			cmaes_problem = args[1];
+			//cmaes_problem = "Rosenbrock";
 			
 			//Get number of problem variables
-			//cmaes_nrVariables = Integer.parseInt(args[2]);
-			cmaes_nrVariables = 512;
+			cmaes_nrVariables = Integer.parseInt(args[2]);
+			//cmaes_nrVariables = 512;
 			
 			//Get population size			
-			//cmaes_populationSize = Integer.parseInt(args[3]);
-			cmaes_populationSize = 512;
+			cmaes_populationSize = Integer.parseInt(args[3]);
+			//cmaes_populationSize = 512;
 			
 			//Get maxEvaluations
-			//cmaes_maxEvaluations = Integer.parseInt(args[4]);
-			cmaes_maxEvaluations = 10000000;			
+			cmaes_maxEvaluations = Integer.parseInt(args[4]);
+			//cmaes_maxEvaluations = 10000000;	
+			
+			//Get number of gpu selected device
+			if(cmaes_version == 1){
+				cmaes_selectedDevice = Integer.parseInt(args[5]);
+			}
 			
 			//##################### Set/Initialize problem #####################//
 			
@@ -88,7 +94,8 @@ public class CMAES_start {
 		catch(Exception ex){
 			//Print error message to console
 			System.out.println("Please enter all required parameters.\n" +
-							   "Example: java -jar CMA-ES.jar 0 Rosenbrock 10 10 1000");
+							   "Example CPU: java -jar CMA-ES.jar 0 Rosenbrock 10 10 1000 \n" +
+							   "Example GPU: java -jar CMA-ES.jar 1 Rosenbrock 10 10 1000 {gpu device index}");
 			System.exit(0);
 		}
 
@@ -116,7 +123,8 @@ public class CMAES_start {
 					try {
 						clcmaesMain = new OpenCL_CMAES_main(cmaes_populationSize, 
 															cmaes_maxEvaluations,
-															problem);
+															problem,
+															cmaes_selectedDevice);
 						//Execute
 						clcmaesMain.Execute();
 					} catch (Exception ex) {

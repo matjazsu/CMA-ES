@@ -20,6 +20,7 @@ public class OpenCL_CMAES_main {
 	private int cl_populationSize;
 	private int cl_maxEvaluations;
 	private Problem cl_problem;
+	private int cl_selectedDevice;
 	
 	//Public properties
 	public Logger cl_logger; //Logger object
@@ -28,7 +29,8 @@ public class OpenCL_CMAES_main {
 	//Constructor
 	public OpenCL_CMAES_main(int populationSize, 
 							 int maxEvaluations, 
-							 Problem problem) throws SecurityException, IOException{
+							 Problem problem,
+							 int selectedDevice) throws SecurityException, IOException{
 		
 		//Initialize logger and file handler
 		cl_logger = Logger.getLogger("OpenCL_CMAES_main");
@@ -39,6 +41,7 @@ public class OpenCL_CMAES_main {
 		this.cl_populationSize = populationSize;
 		this.cl_maxEvaluations = maxEvaluations;
 		this.cl_problem = problem;
+		this.cl_selectedDevice = selectedDevice;
 		
 		this.cl_logger.info("OpenCL version (Host, CPU, GPU) initialized successfully.");
 	}
@@ -60,7 +63,7 @@ public class OpenCL_CMAES_main {
 		    //######################## Initialization segment ########################//
 		    
 		    //Algorithm initialization - CMA ES on OpenCL
-		    algorithm = new OpenCL_CMAES(this.cl_problem);
+		    algorithm = new OpenCL_CMAES(this.cl_problem, this.cl_selectedDevice);
 		    
 		    //Setting algorithm parameters
 		    algorithm.setInputParameter("populationSize", this.cl_populationSize);

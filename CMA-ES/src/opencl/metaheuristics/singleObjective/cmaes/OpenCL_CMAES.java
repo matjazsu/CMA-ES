@@ -118,7 +118,7 @@ public class OpenCL_CMAES extends Algorithm {
 	//########################### CMAES_OpenCL constructor ###########################//
 
 	//Constructor CMAES_OpenCL
-	public OpenCL_CMAES(Problem problem) throws Exception {
+	public OpenCL_CMAES(Problem problem, int selectedDevice) throws Exception {
 		super(problem);
 		
 		//Init seed
@@ -128,7 +128,7 @@ public class OpenCL_CMAES extends Algorithm {
 		rand = new Random(seed);
 
 		//Initialize OpenCL_Manager
-		_openCLManager = new OpenCL_Manager();
+		_openCLManager = new OpenCL_Manager(selectedDevice);
 
 		//Initializa OpenCL context
 		_openCLManager.InitOpenCLContext();
