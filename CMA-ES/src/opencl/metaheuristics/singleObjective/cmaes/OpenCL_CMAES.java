@@ -549,6 +549,7 @@ public class OpenCL_CMAES extends Algorithm {
 				p_bestSolutionEverArray, 
 				null);
 		
+		//sumEval
 		Pointer p_sumEval = Pointer.to(sumEval);
 		sumEvalMem = clCreateBuffer(_openCLManager.context, 
 				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
