@@ -182,7 +182,7 @@ public class OpenCL_CMAES extends Algorithm {
 		resultPopulation.add(bestSolutionEver);
 		
 		//Print best solution ever
-		System.out.println("Best solution: " + bestSolutionEver);
+		//System.out.println("Best solution: " + bestSolutionEver);
 		
 		//Release OpenCL environment
 		_openCLManager.ReleaseOpenCLEnvironment();
@@ -239,9 +239,6 @@ public class OpenCL_CMAES extends Algorithm {
 		
 		//init random
 		randomArray = new float[N];
-		for(int i = 0; i < N; i++){
-			randomArray[i] = (float) rand.nextGaussian(); 
-		}
 		
 		//init sumEval
 		sumEval = new float[1];
@@ -347,6 +344,22 @@ public class OpenCL_CMAES extends Algorithm {
 	 */
 	private void samplePopulation() throws JMException, ClassNotFoundException{
 
+		//Calculate randomArray 
+		for(int i = 0; i < N; i++){
+			randomArray[i] = (float) rand.nextGaussian(); 
+		}
+		
+		//Write randomArray to GPU device
+		Pointer p_randomArray = Pointer.to(randomArray);
+		randomArrayMem = clCreateBuffer(_openCLManager.context, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+				Sizeof.cl_float * randomArray.length,
+				p_randomArray, 
+				null);
+		
+		//Set SamplePopulationKernel argument
+		clSetKernelArg(_openCLManager._samplePopulationKernel, 6, Sizeof.cl_mem, Pointer.to(randomArrayMem));
+		
 		//Set local_work_size
 		long localWorkSizeSamplePopulation = _openCLManager.getLocalWorkSize(populationSize);
 		//Set global_work_size
@@ -511,7 +524,7 @@ public class OpenCL_CMAES extends Algorithm {
 		B2array = matrix2array(B);
 		Pointer p_B2array = Pointer.to(B2array);
 		B2arrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,  
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,  
 				Sizeof.cl_float * B2array.length,
 				p_B2array, 
 				null);
@@ -528,17 +541,9 @@ public class OpenCL_CMAES extends Algorithm {
 		//xmean
 		Pointer p_xmean = Pointer.to(xmean);
 		xmeanMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
 				Sizeof.cl_float * xmean.length,
 				p_xmean, 
-				null);
-		
-		//randomArray
-		Pointer p_randomArray = Pointer.to(randomArray);
-		randomArrayMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-				Sizeof.cl_float * randomArray.length,
-				p_randomArray, 
 				null);
 		
 		//bestSolutionEverArray
@@ -568,7 +573,7 @@ public class OpenCL_CMAES extends Algorithm {
 		//arindex
 		Pointer p_arindex = Pointer.to(arindex);
 		arindexMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
 				Sizeof.cl_float * arindex.length,
 				p_arindex, 
 				null);
@@ -616,7 +621,7 @@ public class OpenCL_CMAES extends Algorithm {
 		//weights
 		Pointer p_weights = Pointer.to(weights);
 		weightsMem = clCreateBuffer(_openCLManager.context, 
-				CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, 
+				CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, 
 				Sizeof.cl_float * weights.length,
 				p_weights, 
 				null);
@@ -671,7 +676,6 @@ public class OpenCL_CMAES extends Algorithm {
 		clSetKernelArg(_openCLManager._samplePopulationKernel, 3, Sizeof.cl_mem, Pointer.to(B2arrayMem));
 		clSetKernelArg(_openCLManager._samplePopulationKernel, 4, Sizeof.cl_mem, Pointer.to(arx2arrayMem));
 		clSetKernelArg(_openCLManager._samplePopulationKernel, 5, Sizeof.cl_mem, Pointer.to(xmeanMem));
-		clSetKernelArg(_openCLManager._samplePopulationKernel, 6, Sizeof.cl_mem, Pointer.to(randomArrayMem));
 		clSetKernelArg(_openCLManager._samplePopulationKernel, 7, Sizeof.cl_float, Pointer.to(new float[]{ sigma }));
 		
 		//Kernel - storeBest

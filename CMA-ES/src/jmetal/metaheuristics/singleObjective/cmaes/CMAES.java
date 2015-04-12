@@ -458,7 +458,7 @@ public class CMAES extends Algorithm {
 			}
 
 			storeBest(comparator);
-			System.out.println(counteval + ": " + bestSolutionEver);
+			//System.out.println(counteval + ": " + bestSolutionEver);
 			updateDistribution();
 		}
 
